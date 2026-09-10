@@ -3,8 +3,9 @@
 class ProgrammeSync
   class ApiError < StandardError; end
 
-  def initialize(generation: 1)
+  def initialize(generation: 1, http_client: nil)
     @generation = generation
+    @http_client = http_client
     @run = SyncRun.create!(started_at: Time.current, generation: generation)
   end
 
@@ -42,7 +43,7 @@ class ProgrammeSync
   end
 
   def connection
-    @connection ||= Faraday.new(url: ENV.fetch("FESTIVAL_API_URL", "http://localhost:3000")) do |f|
+    @connection ||= @http_client || Faraday.new(url: ENV.fetch("FESTIVAL_API_URL", "http://localhost:3000")) do |f|
       f.response :json
       f.adapter Faraday.default_adapter
     end
@@ -51,7 +52,10 @@ class ProgrammeSync
   def sync_screening(record)
     external_id = record["id"]
 
-    ActiveRecord::Base.transaction do
+    # requires_new: true -> without it, one bad record could roll
+    # back every record already synced earlier in this run, but only when
+    # this code runs inside another transaction (like when testing).
+    ActiveRecord::Base.transaction(requires_new: true) do
       film  = upsert_film(record["film"] || {})
       venue = upsert_venue(record["venue"] || {})
 
