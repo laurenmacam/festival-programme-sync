@@ -8,17 +8,24 @@
 # where each entry looks like:
 #   { "id" => "VEN-01", "name" => "Grand Cinema", "address" => "...", "capacity" => 320 }
 class VenueSync
+  Failure = Struct.new(:external_id, :message)
+
+  attr_reader :failures
+
   def initialize(venues)
     @venues = venues
+    @failures = []
   end
 
   def call
     @venues.each do |attrs|
-      venue = Venue.find_or_initialize_by(name: attrs["name"])
-      venue.external_id = attrs.fetch("id")
-      venue.address     = attrs["address"]
-      venue.capacity    = attrs["capacity"]
+      venue = Venue.find_or_initialize_by(external_id: attrs.fetch("id"))
+      venue.name     = attrs["name"]
+      venue.address  = attrs["address"]
+      venue.capacity = attrs["capacity"]
       venue.save!
+    rescue StandardError => e
+      @failures << Failure.new(attrs["id"], e.message)
     end
   end
 end
