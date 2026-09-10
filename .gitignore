@@ -34,3 +34,5 @@
 
 # Local helper logs.
 /*.log
+
+/CLAUDE.md
